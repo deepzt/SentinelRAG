@@ -18,7 +18,8 @@ class Settings(BaseSettings):
 
     # LLM (optional)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama3"
+    OLLAMA_MODEL: str = "llama3.1:latest"
+    OLLAMA_FALLBACK_MODEL: str = "gemma4:e2b"
 
     # App
     ENVIRONMENT: str = "development"

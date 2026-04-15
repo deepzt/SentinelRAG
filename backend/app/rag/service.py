@@ -124,21 +124,40 @@ async def handle_query(
             chunks_retrieved=0,
         )
 
-    # 4. Generate response
-    answer = await llm_client.generate(
-        request.query,
-        [c.chunk_text for c in chunks],
-    )
-
-    # 5. Write audit log — always, including when answer is LLM-unavailable
+    # 4. Generate response — wrapped so an LLM failure still writes an audit row
     retrieved_ids = [str(c.chunk_id) for c in chunks]
+    try:
+        answer = await llm_client.generate(
+            request.query,
+            [c.chunk_text for c in chunks],
+        )
+        access_decision = "allowed"
+    except Exception:
+        # LLM is unavailable or crashed — log the error, return partial response
+        await write_audit_log(
+            db,
+            user_id=current_user.id,
+            query=request.query,
+            retrieved_doc_ids=retrieved_ids,
+            response_time_ms=int(time.monotonic() * 1000) - start_ms,
+            access_decision="error",
+        )
+        return QueryResponse(
+            query=request.query,
+            answer="The language model is currently unavailable. Retrieved documents are cited below.",
+            citations=_build_citations(chunks),
+            access_decision="allowed",
+            chunks_retrieved=len(chunks),
+        )
+
+    # 5. Write audit log — always, including when LLM returns a fallback message
     await write_audit_log(
         db,
         user_id=current_user.id,
         query=request.query,
         retrieved_doc_ids=retrieved_ids,
         response_time_ms=int(time.monotonic() * 1000) - start_ms,
-        access_decision="allowed",
+        access_decision=access_decision,
     )
 
     # 6. Return with citations
@@ -146,6 +165,6 @@ async def handle_query(
         query=request.query,
         answer=answer,
         citations=_build_citations(chunks),
-        access_decision="allowed",
+        access_decision=access_decision,
         chunks_retrieved=len(chunks),
     )

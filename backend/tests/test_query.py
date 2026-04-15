@@ -1,108 +1,151 @@
-"""Query endpoint RBAC tests.
+"""Query endpoint and RBAC tests.
 
 Covers:
 - POST /query  no token → 403
-- POST /query  role with no access policies → denied + audit log written
-- POST /query  role with policies but no matching chunks → denied response
-- GET  /documents  role isolation — hr user gets no engineering docs
-
-RBAC edge cases handled:
-1. Role with zero access_policies rows → denied immediately (no DB scan)
-2. Role with policies but zero matching chunks → denied (logged)
-3. Audit log written for ALL outcomes including denied requests
+- POST /query  role with no access policies → HTTP 200 but access_decision=denied + audit logged
+- POST /query  role with policies, no indexed chunks → denied, no doc content leaked
+- POST /query  input validation (empty query, too long)
+- GET  /documents  RBAC filter — user with no policies gets empty list
+- GET  /admin/audit-report  engineer blocked → 403
 """
 
-import pytest
-from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from httpx import AsyncClient
 
 from app.models.audit_log import AuditLog
 from app.models.user import User
+from tests.conftest import get_token
 
 
-async def _get_token(client: AsyncClient, user: User, password: str = "test_password") -> str:
-    response = await client.post(
-        "/auth/login",
-        json={"username": user.username, "password": password},
-    )
-    return response.json()["access_token"]
-
-
-@pytest.mark.asyncio
 async def test_query_requires_auth(client: AsyncClient):
     response = await client.post("/query", json={"query": "What are the AWS rollback steps?"})
     assert response.status_code == 403
 
 
-@pytest.mark.asyncio
 async def test_query_denied_when_no_policies(
     client: AsyncClient, hr_user: User, db_session: AsyncSession
 ):
-    """hr_user has no access_policies rows in this test → denied immediately."""
-    token = await _get_token(client, hr_user)
+    """hr_user fixture has no access_policies rows inserted → denied immediately.
+
+    Verifies the early-deny path in rag/service.py (no DB scan performed).
+    """
+    token = await get_token(client, hr_user)
     response = await client.post(
         "/query",
         json={"query": "What are the employee leave policies?"},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 200  # HTTP 200, but access_decision = denied
+    assert response.status_code == 200  # HTTP 200 — denial is in the payload
     data = response.json()
     assert data["access_decision"] == "denied"
     assert data["chunks_retrieved"] == 0
+    assert data["citations"] == []
 
     # Audit log must be written even for denied requests
-    logs = await db_session.execute(
+    result = await db_session.execute(
         select(AuditLog).where(
             AuditLog.user_id == hr_user.id,
             AuditLog.access_decision == "denied",
         )
     )
-    assert logs.scalar_one_or_none() is not None
+    assert result.scalar_one_or_none() is not None, "Denied query must produce an audit log row"
 
 
-@pytest.mark.asyncio
-async def test_query_denied_returns_no_doc_content(
+async def test_query_denied_leaks_no_doc_content(
     client: AsyncClient, engineer_user: User, engineer_policy
 ):
-    """Engineer has policies but no chunks indexed → safe 'no docs found' response."""
-    token = await _get_token(client, engineer_user)
+    """Even when access is denied, no internal document content or schema details leak."""
+    token = await get_token(client, engineer_user)
     response = await client.post(
         "/query",
         json={"query": "AWS ECS rollback procedure"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200
-    data = response.json()
-    # No chunks in DB → denied outcome with empty citations
-    assert data["citations"] == []
-    assert "hashed_password" not in str(data)
-    assert "access_policies" not in str(data)
+    body = str(response.json())
+    # Nothing internal should appear in the response body
+    assert "hashed_password" not in body
+    assert "access_policies" not in body
+    assert "document_chunks" not in body
+    assert "traceback" not in body.lower()
 
 
-@pytest.mark.asyncio
-async def test_documents_rbac_isolation(
-    client: AsyncClient, hr_user: User, engineer_user: User,
-    engineer_policy, db_session: AsyncSession
+async def test_query_input_too_long_rejected(client: AsyncClient, engineer_user: User):
+    """Query exceeding max_length=2000 must be rejected with 422."""
+    token = await get_token(client, engineer_user)
+    response = await client.post(
+        "/query",
+        json={"query": "x" * 2001},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
+async def test_query_empty_string_rejected(client: AsyncClient, engineer_user: User):
+    """Empty query must be rejected (min_length=1) with 422."""
+    token = await get_token(client, engineer_user)
+    response = await client.post(
+        "/query",
+        json={"query": ""},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
+
+
+async def test_query_top_k_bounds(client: AsyncClient, engineer_user: User, engineer_policy):
+    """top_k must be bounded to [1, 20]; values outside are rejected."""
+    token = await get_token(client, engineer_user)
+
+    # top_k=0 → 422
+    r = await client.post(
+        "/query",
+        json={"query": "AWS rollback", "top_k": 0},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 422
+
+    # top_k=21 → 422
+    r = await client.post(
+        "/query",
+        json={"query": "AWS rollback", "top_k": 21},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 422
+
+
+async def test_documents_no_policies_returns_empty(
+    client: AsyncClient, hr_user: User
 ):
-    """HR user must not see engineering documents even if they exist."""
-    hr_token = await _get_token(client, hr_user)
+    """User with no access_policies rows sees zero documents."""
+    token = await get_token(client, hr_user)
     response = await client.get(
-        "/documents", headers={"Authorization": f"Bearer {hr_token}"}
+        "/documents", headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200
     data = response.json()
-    # hr_user has no policies → empty list
     assert data["total"] == 0
     assert data["items"] == []
 
 
-@pytest.mark.asyncio
 async def test_admin_endpoint_blocked_for_engineer(
     client: AsyncClient, engineer_user: User, engineer_policy
 ):
-    """Non-admin roles must receive 403 from /admin/* endpoints."""
-    token = await _get_token(client, engineer_user)
+    """Engineer role must receive 403 from /admin/* endpoints."""
+    token = await get_token(client, engineer_user)
+    response = await client.get(
+        "/admin/audit-report",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin access required"
+
+
+async def test_admin_endpoint_blocked_for_hr(
+    client: AsyncClient, hr_user: User
+):
+    """HR role must also receive 403 from /admin/* endpoints."""
+    token = await get_token(client, hr_user)
     response = await client.get(
         "/admin/audit-report",
         headers={"Authorization": f"Bearer {token}"},

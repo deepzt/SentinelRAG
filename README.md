@@ -155,13 +155,15 @@ See [`docs/threat-model.md`](docs/threat-model.md) for full threat analysis.
 
 ### Phase 1 (Current — Local MVP)
 - [x] Project structure + Docker Compose
-- [ ] SQLAlchemy models + Alembic migrations
-- [ ] Auth: JWT login endpoint
-- [ ] Ingestion pipeline: PDF + Markdown → pgvector
-- [ ] RBAC-filtered retrieval
-- [ ] Audit logging
-- [ ] Streamlit chat UI
-- [ ] Sample enterprise documents
+- [x] SQLAlchemy models + Alembic migrations
+- [x] Auth: JWT login endpoint + bcrypt passwords
+- [x] Ingestion pipeline: PDF + Markdown → pgvector
+- [x] RBAC-filtered retrieval (SQL-level, access_policies table)
+- [x] Audit logging (append-only, every query including denied)
+- [x] Streamlit chat UI (login, chat, admin dashboard)
+- [x] Sample enterprise documents (8 docs across engineering, HR, legal)
+- [x] Security hardening (alg:none blocked, global error handler, no secret in source)
+- [x] pytest test suite (auth, RBAC, JWT attacks, admin access)
 
 ### Phase 2 (Cloud)
 - AWS/GCP deployment
@@ -179,7 +181,7 @@ See [`docs/threat-model.md`](docs/threat-model.md) for full threat analysis.
 | Backend | FastAPI, SQLAlchemy 2.0, Alembic |
 | Vector DB | PostgreSQL 16 + pgvector |
 | Embeddings | sentence-transformers/all-MiniLM-L6-v2 (384-dim) |
-| LLM | Ollama (local) |
+| LLM | Ollama — llama3.1:latest (fallback: gemma4:e2b) |
 | Frontend | Streamlit |
 | Auth | python-jose (JWT), bcrypt |
 | Testing | pytest, httpx |

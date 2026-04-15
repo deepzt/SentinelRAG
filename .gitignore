@@ -46,3 +46,10 @@ htmlcov/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project planning / dev artifacts (not part of the deployable project)
+Plan.txt
+data.txt
+agents/
+skills/
+.claude/
