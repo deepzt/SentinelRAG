@@ -1,0 +1,90 @@
+[
+  {
+    "file_path": "docs/sample/aws-incident-runbook.md",
+    "title": "AWS Incident Response Runbook",
+    "department": "engineering",
+    "role_required": "engineer",
+    "doc_type": "runbook",
+    "security_level": "L2",
+    "classification": "internal",
+    "version": "v2",
+    "tags": ["aws", "ecs", "incident", "rollback", "on-call"]
+  },
+  {
+    "file_path": "docs/sample/microservice-deployment-checklist.md",
+    "title": "Microservice Deployment Checklist",
+    "department": "engineering",
+    "role_required": "engineer",
+    "doc_type": "checklist",
+    "security_level": "L2",
+    "classification": "internal",
+    "version": "v1",
+    "tags": ["deployment", "microservice", "checklist", "release"]
+  },
+  {
+    "file_path": "docs/sample/aws-deployment-sop.md",
+    "title": "AWS Deployment Standard Operating Procedure",
+    "department": "engineering",
+    "role_required": "engineer",
+    "doc_type": "sop",
+    "security_level": "L2",
+    "classification": "internal",
+    "version": "v1",
+    "tags": ["aws", "deployment", "sop", "ecs", "terraform"]
+  },
+  {
+    "file_path": "docs/sample/leave-policy-2026.md",
+    "title": "Employee Leave Policy 2026",
+    "department": "hr",
+    "role_required": "hr",
+    "doc_type": "policy",
+    "security_level": "L2",
+    "classification": "confidential",
+    "version": "v1",
+    "tags": ["leave", "pto", "policy", "hr", "benefits"]
+  },
+  {
+    "file_path": "docs/sample/reimbursement-sop.md",
+    "title": "Expense Reimbursement SOP",
+    "department": "hr",
+    "role_required": "hr",
+    "doc_type": "sop",
+    "security_level": "L2",
+    "classification": "internal",
+    "version": "v1",
+    "tags": ["expense", "reimbursement", "finance", "hr"]
+  },
+  {
+    "file_path": "docs/sample/onboarding-checklist.md",
+    "title": "New Hire Onboarding Checklist",
+    "department": "hr",
+    "role_required": "hr",
+    "doc_type": "checklist",
+    "security_level": "L1",
+    "classification": "internal",
+    "version": "v1",
+    "tags": ["onboarding", "new-hire", "hr", "day-1"]
+  },
+  {
+    "file_path": "docs/sample/nda-template.md",
+    "title": "Non-Disclosure Agreement Template",
+    "department": "legal",
+    "role_required": "manager",
+    "doc_type": "template",
+    "security_level": "L3",
+    "classification": "confidential",
+    "version": "v1",
+    "tags": ["nda", "legal", "confidentiality", "contract"]
+  },
+  {
+    "file_path": "docs/sample/vendor-agreement-process.md",
+    "title": "Vendor Onboarding Agreement Process",
+    "department": "legal",
+    "role_required": "manager",
+    "doc_type": "sop",
+    "security_level": "L3",
+    "classification": "confidential",
+    "version": "v1",
+    "tags": ["vendor", "procurement", "legal", "contract"]
+  }
+]
