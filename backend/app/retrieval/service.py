@@ -23,9 +23,11 @@ MIN_SCORE: float = 0.25       # Chunks below this cosine similarity are discarde
 MAX_CHUNKS_PER_DOC: int = 2   # Max chunks returned per unique document
 
 
-# Two-layer RBAC:
-# Layer 1: dc.role_required = :user_role  (fast indexed scan)
-# Layer 2: JOIN access_policies  (policy-table RBAC — no hardcoded role logic)
+# RBAC via access_policies JOIN (single source of truth):
+# The JOIN enforces: user's role must have a policy permitting the chunk's
+# department AND the document's classification. No hardcoded role checks.
+# dc.role_required is NOT used as a filter here — it records the minimum role
+# at ingest time but access decisions are owned by the access_policies table.
 # The inner CTE scores all permitted chunks; the outer SELECT deduplicates per doc.
 
 _RBAC_SEARCH_SQL = text(
@@ -51,8 +53,7 @@ _RBAC_SEARCH_SQL = text(
            AND d.classification = ANY(
                string_to_array(ap.allowed_classification, ',')
            )
-        WHERE dc.role_required = :user_role
-          AND dc.embedding IS NOT NULL
+        WHERE dc.embedding IS NOT NULL
     )
     SELECT chunk_id, document_id, chunk_text, title, metadata, score
     FROM   ranked
@@ -78,11 +79,13 @@ async def rbac_vector_search(
     Returns chunks the user's role is permitted to see, ranked by cosine
     similarity. Low-scoring results and over-represented documents are pruned.
     """
-    # asyncpg requires the vector to be passed as a Python list directly
+    # asyncpg requires the embedding as a string; PostgreSQL's ::vector cast
+    # accepts '[0.1, 0.2, ...]' string syntax. Passing a raw Python list fails
+    # without the pgvector asyncpg codec registered on the connection.
     result = await db.execute(
         _RBAC_SEARCH_SQL,
         {
-            "query_embedding": query_embedding,
+            "query_embedding": str(query_embedding),
             "user_role": user_role,
             "top_k": top_k,
             "min_score": min_score,

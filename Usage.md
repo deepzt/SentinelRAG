@@ -138,15 +138,18 @@ Expected: access denied message, zero citations.
 
 ### Charlie — Manager
 
-Log in as `charlie` / `charlie123`. Charlie sees engineering + HR + legal documents:
+Log in as `charlie` / `charlie123`. Charlie sees engineering (internal) + HR (internal) + legal documents:
 
 ```
 Summarize the incident response process
 What are the key clauses in our NDA template?
 Walk me through the vendor onboarding process
-What leave types does the company offer and what are the approval steps?
+What does a new hire do in their first week?
 What are the pre-deployment checklist items for a microservice release?
+How do I submit an expense reimbursement?
 ```
+
+> Note: The Employee Leave Policy is classified `confidential` and the manager policy only permits `internal` HR docs — so leave policy questions will be denied for Charlie.
 
 Charlie also has access to the **Analytics dashboard** (Admin tab in the sidebar) which shows query volume, denied access logs, and active users by role.
 
@@ -156,11 +159,14 @@ Charlie also has access to the **Analytics dashboard** (Admin tab in the sidebar
 
 The most compelling demo: send the **same query** as different users and observe the results.
 
-1. Log in as `alice` — ask: `"How do I roll back an ECS deployment?"`  
+1. Log in as `alice` — ask: `"How do I roll back an ECS deployment?"`
    → Grounded answer with citations from the AWS Incident Runbook.
 
-2. Log out. Log in as `bob` — ask the same question.  
+2. Log out. Log in as `bob` — ask the same question.
    → Access denied. No document titles, no content, no hints about what engineering docs exist.
+
+3. Log out. Log in as `charlie` — ask the same question.
+   → Grounded answer (manager policy permits engineering internal docs).
 
 This demonstrates that RBAC is enforced at the SQL/vector-search layer — not just in the UI.
 
