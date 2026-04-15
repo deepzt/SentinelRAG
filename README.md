@@ -63,11 +63,12 @@ Bob cannot see any engineering documents. Alice cannot see any HR documents. Nei
 ### Prerequisites
 - Docker + Docker Compose
 - Git
+- [Ollama](https://ollama.com/) with `llama3.1:latest` pulled
 
 ### Run
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/deepzt/SentinelRAG.git
 cd SentinelRAG
 cp .env.example .env
 # Edit .env — set SECRET_KEY to a real random value
@@ -84,6 +85,7 @@ Services:
 ```bash
 # After containers are up:
 docker compose exec backend python -m app.scripts.seed_db
+docker compose exec backend python -m app.scripts.ingest_samples
 ```
 
 ### Run tests
@@ -91,6 +93,8 @@ docker compose exec backend python -m app.scripts.seed_db
 ```bash
 docker compose exec backend pytest tests/ -v
 ```
+
+For a full walkthrough — Docker commands, demo queries per user, RBAC testing, and troubleshooting — see **[Usage.md](Usage.md)**.
 
 ---
 

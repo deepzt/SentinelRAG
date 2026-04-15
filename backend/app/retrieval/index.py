@@ -48,12 +48,22 @@ async def index_exists(db: AsyncSession) -> bool:
     return result.scalar_one_or_none() is not None
 
 
+async def _run_autocommit_ddl(sql: str) -> None:
+    """Execute a DDL statement that must run outside a transaction block.
+
+    CREATE/DROP INDEX CONCURRENTLY require autocommit mode in PostgreSQL.
+    SQLAlchemy's AsyncSession always opens a transaction, so we bypass it
+    by using the engine directly with isolation_level=AUTOCOMMIT.
+    """
+    from app.core.database import engine  # local import avoids circular dependency
+    async with engine.connect() as conn:
+        await conn.execution_options(isolation_level="AUTOCOMMIT")
+        await conn.execute(text(sql))
+
+
 async def drop_ivfflat_index(db: AsyncSession) -> None:
     """Drop the ivfflat index. Call before re-ingesting the full corpus."""
-    await db.execute(
-        text(f"DROP INDEX CONCURRENTLY IF EXISTS {INDEX_NAME}")
-    )
-    await db.commit()
+    await _run_autocommit_ddl(f"DROP INDEX CONCURRENTLY IF EXISTS {INDEX_NAME}")
     logger.info("Dropped ivfflat index %s", INDEX_NAME)
 
 
@@ -93,18 +103,16 @@ async def create_ivfflat_index(
         "Creating ivfflat index on %d chunks (lists=%d)…", chunk_count, lists
     )
 
-    # CONCURRENTLY allows reads during index build (no table lock)
-    await db.execute(
-        text(
-            f"""
-            CREATE INDEX CONCURRENTLY IF NOT EXISTS {INDEX_NAME}
-            ON document_chunks
-            USING ivfflat (embedding vector_cosine_ops)
-            WITH (lists = {lists})
-            """
-        )
+    # CONCURRENTLY allows reads during index build (no table lock).
+    # Must run outside a transaction — _run_autocommit_ddl handles this.
+    await _run_autocommit_ddl(
+        f"""
+        CREATE INDEX CONCURRENTLY IF NOT EXISTS {INDEX_NAME}
+        ON document_chunks
+        USING ivfflat (embedding vector_cosine_ops)
+        WITH (lists = {lists})
+        """
     )
-    await db.commit()
 
     logger.info("ivfflat index created: %s (lists=%d)", INDEX_NAME, lists)
     return {"action": "created", "lists": lists, "chunk_count": chunk_count}
