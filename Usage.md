@@ -86,13 +86,11 @@ curl http://localhost:8000/health
 
 ## 5. Demo Users
 
-All passwords are `password123`.
-
-| Username | Role | Department | Document Access |
-|----------|------|------------|-----------------|
-| `alice` | engineer | platform | Engineering docs only |
-| `bob` | hr | people_ops | HR docs (internal + confidential) |
-| `charlie` | manager | engineering | Engineering + HR + Legal (internal) |
+| Username | Password | Role | Department | Document Access |
+|----------|----------|------|------------|-----------------|
+| `alice` | `alice123` | engineer | platform | Engineering docs only |
+| `bob` | `bob123` | hr | people_ops | HR docs (internal + confidential) |
+| `charlie` | `charlie123` | manager | engineering | Engineering + HR + Legal (internal) |
 
 ---
 
@@ -100,7 +98,7 @@ All passwords are `password123`.
 
 ### Alice — Engineer
 
-Log in as `alice` / `password123`. These queries should return answers with citations:
+Log in as `alice` / `alice123`. These queries should return answers with citations:
 
 ```
 What are the steps to roll back an ECS deployment?
@@ -120,7 +118,7 @@ Expected: access denied message, zero citations.
 
 ### Bob — HR
 
-Log in as `bob` / `password123`. These queries should return answers with citations:
+Log in as `bob` / `bob123`. These queries should return answers with citations:
 
 ```
 What types of leave are available to employees?
@@ -140,7 +138,7 @@ Expected: access denied message, zero citations.
 
 ### Charlie — Manager
 
-Log in as `charlie` / `password123`. Charlie sees engineering + HR + legal documents:
+Log in as `charlie` / `charlie123`. Charlie sees engineering + HR + legal documents:
 
 ```
 Summarize the incident response process
