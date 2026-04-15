@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: sentinelrag
+          POSTGRES_PASSWORD: sentinelrag_secret
+          POSTGRES_DB: sentinelrag_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://sentinelrag:sentinelrag_secret@localhost:5432/sentinelrag_test
+          SECRET_KEY: ci-test-secret-key-not-for-production
+          JWT_ALGORITHM: HS256
+          ENVIRONMENT: test
+        run: |
+          cd backend
+          pytest tests/ -v --tb=short
