@@ -7,9 +7,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-# Import all models so Alembic can detect them for autogenerate
-# BackendDev: add imports here as models are created
-# from app.models import user, document, chunk, audit, chat  # noqa: F401
+# Import all models so Alembic autogenerate can detect them
+import app.models  # noqa: F401  — registers all ORM models with Base.metadata
 
 from app.core.config import settings
 from app.core.database import Base
