@@ -57,8 +57,8 @@ DEMO_POLICIES = [
     # Managers see engineering internal + HR internal
     {"role": "manager", "department": "engineering", "allowed_classification": "internal"},
     {"role": "manager", "department": "hr", "allowed_classification": "internal"},
-    # Legal accessible to managers too
-    {"role": "manager", "department": "legal", "allowed_classification": "internal"},
+    # Legal (internal + confidential) accessible to managers
+    {"role": "manager", "department": "legal", "allowed_classification": "internal,confidential"},
 ]
 
 

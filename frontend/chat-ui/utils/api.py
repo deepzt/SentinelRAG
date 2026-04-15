@@ -78,13 +78,16 @@ def get_me(token: str) -> tuple[dict | None, str | None]:
 # ── Query ─────────────────────────────────────────────────────────────────────
 
 def send_query(
-    token: str, query: str, top_k: int = 4
+    token: str, query: str, top_k: int = 4, session_id: str | None = None
 ) -> tuple[dict | None, str | None]:
     """POST /query — returns (query_response, error)."""
+    body: dict = {"query": query, "top_k": top_k}
+    if session_id:
+        body["session_id"] = session_id
     try:
         r = httpx.post(
             f"{BACKEND_URL}/query",
-            json={"query": query, "top_k": top_k},
+            json=body,
             headers=_headers(token),
             timeout=60.0,  # LLM can be slow
         )
@@ -113,6 +116,42 @@ def get_audit_report(
         r = httpx.get(
             f"{BACKEND_URL}/admin/audit-report",
             params=params,
+            headers=_headers(token),
+            timeout=_TIMEOUT,
+        )
+        if r.status_code == 200:
+            return r.json(), None
+        return None, _handle_error(r)
+    except httpx.ConnectError:
+        return None, "Cannot connect to backend."
+    except httpx.TimeoutException:
+        return None, "Request timed out."
+
+
+# ── Chat sessions ─────────────────────────────────────────────────────────────
+
+def create_chat_session(token: str) -> tuple[dict | None, str | None]:
+    """POST /chat/sessions — create a new session, returns {id, ...}."""
+    try:
+        r = httpx.post(
+            f"{BACKEND_URL}/chat/sessions",
+            headers=_headers(token),
+            timeout=_TIMEOUT,
+        )
+        if r.status_code == 200:
+            return r.json(), None
+        return None, _handle_error(r)
+    except httpx.ConnectError:
+        return None, "Cannot connect to backend."
+    except httpx.TimeoutException:
+        return None, "Request timed out."
+
+
+def get_session_messages(token: str, session_id: str) -> tuple[list | None, str | None]:
+    """GET /chat/sessions/{id}/messages — returns list of {sender, message, ...}."""
+    try:
+        r = httpx.get(
+            f"{BACKEND_URL}/chat/sessions/{session_id}/messages",
             headers=_headers(token),
             timeout=_TIMEOUT,
         )

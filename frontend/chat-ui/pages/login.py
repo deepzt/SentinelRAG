@@ -64,9 +64,12 @@ if submitted:
             if err2:
                 st.error(f"Login succeeded but could not load profile: {err2}")
             else:
-                st.session_state["token"] = token_data["access_token"]
+                token = token_data["access_token"]
+                session_data, _ = api.create_chat_session(token)
+                st.session_state["token"] = token
                 st.session_state["user"] = user_data
                 st.session_state["messages"] = []
+                st.session_state["session_id"] = session_data["id"] if session_data else None
                 st.switch_page("pages/chat.py")
 
 # ── Demo accounts ─────────────────────────────────────────────────────────────
@@ -87,10 +90,13 @@ with st.expander("Demo accounts — click to auto-fill", expanded=True):
             if err:
                 st.error(err)
             else:
-                user_data, _ = api.get_me(token_data["access_token"])
-                st.session_state["token"] = token_data["access_token"]
+                token = token_data["access_token"]
+                user_data, _ = api.get_me(token)
+                session_data, _ = api.create_chat_session(token)
+                st.session_state["token"] = token
                 st.session_state["user"] = user_data or {"username": uname}
                 st.session_state["messages"] = []
+                st.session_state["session_id"] = session_data["id"] if session_data else None
                 st.switch_page("pages/chat.py")
 
     _quick_login("alice", "alice123", "Alice — Engineer", col1)

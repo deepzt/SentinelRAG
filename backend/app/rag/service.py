@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import write_audit_log
 from app.core.config import settings
 from app.models.access_policy import AccessPolicy
+from app.models.chat import ChatMessage
 from app.models.user import User
 from app.rag import llm as llm_client
 from app.rag.retrieval import rbac_vector_search
@@ -42,6 +43,18 @@ def embed_query(query: str) -> list[float]:
     model = get_embedding_model()
     vector = model.encode(query, normalize_embeddings=True)
     return vector.tolist()
+
+
+async def _save_chat_messages(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    user_query: str,
+    assistant_answer: str,
+) -> None:
+    """Persist user + assistant turn to chat_messages."""
+    db.add(ChatMessage(session_id=session_id, sender="user", message=user_query))
+    db.add(ChatMessage(session_id=session_id, sender="assistant", message=assistant_answer))
+    await db.commit()
 
 
 async def _role_has_policies(db: AsyncSession, role: str) -> bool:
@@ -86,12 +99,16 @@ async def handle_query(
             response_time_ms=int(time.monotonic() * 1000) - start_ms,
             access_decision="denied",
         )
+        denial = "Access denied: your role does not have any document access policies configured."
+        if request.session_id:
+            await _save_chat_messages(db, request.session_id, request.query, denial)
         return QueryResponse(
             query=request.query,
-            answer="Access denied: your role does not have any document access policies configured.",
+            answer=denial,
             citations=[],
             access_decision="denied",
             chunks_retrieved=0,
+            session_id=request.session_id,
         )
 
     # 2. Embed query
@@ -116,12 +133,16 @@ async def handle_query(
             response_time_ms=elapsed_ms,
             access_decision="denied",
         )
+        denial = "No accessible documents were found for your query."
+        if request.session_id:
+            await _save_chat_messages(db, request.session_id, request.query, denial)
         return QueryResponse(
             query=request.query,
-            answer="No accessible documents were found for your query.",
+            answer=denial,
             citations=[],
             access_decision="denied",
             chunks_retrieved=0,
+            session_id=request.session_id,
         )
 
     # 4. Generate response — wrapped so an LLM failure still writes an audit row
@@ -134,6 +155,7 @@ async def handle_query(
         access_decision = "allowed"
     except Exception:
         # LLM is unavailable or crashed — log the error, return partial response
+        fallback = "The language model is currently unavailable. Retrieved documents are cited below."
         await write_audit_log(
             db,
             user_id=current_user.id,
@@ -142,15 +164,22 @@ async def handle_query(
             response_time_ms=int(time.monotonic() * 1000) - start_ms,
             access_decision="error",
         )
+        if request.session_id:
+            await _save_chat_messages(db, request.session_id, request.query, fallback)
         return QueryResponse(
             query=request.query,
-            answer="The language model is currently unavailable. Retrieved documents are cited below.",
+            answer=fallback,
             citations=_build_citations(chunks),
             access_decision="allowed",
             chunks_retrieved=len(chunks),
+            session_id=request.session_id,
         )
 
-    # 5. Write audit log — always, including when LLM returns a fallback message
+    # 5. Save chat history
+    if request.session_id:
+        await _save_chat_messages(db, request.session_id, request.query, answer)
+
+    # 6. Write audit log
     await write_audit_log(
         db,
         user_id=current_user.id,
@@ -160,11 +189,12 @@ async def handle_query(
         access_decision=access_decision,
     )
 
-    # 6. Return with citations
+    # 7. Return with citations
     return QueryResponse(
         query=request.query,
         answer=answer,
         citations=_build_citations(chunks),
         access_decision=access_decision,
         chunks_retrieved=len(chunks),
+        session_id=request.session_id,
     )

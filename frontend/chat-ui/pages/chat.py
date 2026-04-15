@@ -63,9 +63,22 @@ st.markdown(
 # ── Session helpers ───────────────────────────────────────────────────────────
 token: str = st.session_state["token"]
 user: dict = st.session_state["user"]
+session_id: str | None = st.session_state.get("session_id")
 
-if "messages" not in st.session_state:
+# Load persisted history once per session (only when messages list is empty)
+if "messages" not in st.session_state or not st.session_state["messages"]:
     st.session_state["messages"] = []
+    if session_id:
+        history, _ = api.get_session_messages(token, session_id)
+        if history:
+            for msg in history:
+                role = "user" if msg["sender"] == "user" else "assistant"
+                st.session_state["messages"].append({
+                    "role": role,
+                    "content": msg["message"],
+                    "citations": [],
+                    "access_decision": "allowed",
+                })
 
 
 def _handle_expired() -> None:
@@ -123,7 +136,9 @@ with st.sidebar:
             st.switch_page("pages/admin.py")
 
     if st.button("Clear Chat", use_container_width=True):
+        new_session, _ = api.create_chat_session(token)
         st.session_state["messages"] = []
+        st.session_state["session_id"] = new_session["id"] if new_session else session_id
         st.rerun()
 
     st.divider()
@@ -171,7 +186,7 @@ if prompt:
     # Call backend
     with st.chat_message("assistant"):
         with st.spinner("Searching knowledge base…"):
-            result, err = api.send_query(token, prompt)
+            result, err = api.send_query(token, prompt, session_id=session_id)
 
         if err:
             if api.is_session_expired_error(err):

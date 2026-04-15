@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api import admin, auth, documents, query
+from app.api import admin, auth, chat, documents, query
 from app.core.config import settings
 from app.core.limiter import limiter
 
@@ -36,6 +36,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(query.router, prefix="/query", tags=["query"])
 app.include_router(documents.router, prefix="/documents", tags=["documents"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
 
 
 @app.exception_handler(Exception)
