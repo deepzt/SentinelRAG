@@ -54,10 +54,9 @@ DEMO_POLICIES = [
     {"role": "engineer", "department": "engineering", "allowed_classification": "internal"},
     # HR sees internal and confidential HR docs
     {"role": "hr", "department": "hr", "allowed_classification": "internal,confidential"},
-    # Managers see engineering internal + HR internal
+    # Managers see their own department (engineering) + legal docs
+    # HR docs are restricted to HR staff only — managers do not have cross-dept HR access
     {"role": "manager", "department": "engineering", "allowed_classification": "internal"},
-    {"role": "manager", "department": "hr", "allowed_classification": "internal"},
-    # Legal (internal + confidential) accessible to managers
     {"role": "manager", "department": "legal", "allowed_classification": "internal,confidential"},
 ]
 

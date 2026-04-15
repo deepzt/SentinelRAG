@@ -90,7 +90,7 @@ curl http://localhost:8000/health
 |----------|----------|------|------------|-----------------|
 | `alice` | `alice123` | engineer | platform | Engineering docs only |
 | `bob` | `bob123` | hr | people_ops | HR docs (internal + confidential) |
-| `charlie` | `charlie123` | manager | engineering | Engineering + HR + Legal (internal) |
+| `charlie` | `charlie123` | manager | engineering | Engineering + Legal docs only |
 
 ---
 
@@ -138,18 +138,17 @@ Expected: access denied message, zero citations.
 
 ### Charlie — Manager
 
-Log in as `charlie` / `charlie123`. Charlie sees engineering (internal) + HR (internal) + legal documents:
+Log in as `charlie` / `charlie123`. Charlie manages the engineering team and sees engineering + legal documents:
 
 ```
 Summarize the incident response process
 What are the key clauses in our NDA template?
 Walk me through the vendor onboarding process
-What does a new hire do in their first week?
 What are the pre-deployment checklist items for a microservice release?
-How do I submit an expense reimbursement?
+Who do I escalate to during a P1 AWS incident?
 ```
 
-> Note: The Employee Leave Policy is classified `confidential` and the manager policy only permits `internal` HR docs — so leave policy questions will be denied for Charlie.
+> Note: HR documents (leave policy, reimbursement, onboarding) are restricted to HR staff only. Charlie cannot see them.
 
 Charlie also has access to the **Analytics dashboard** (Admin tab in the sidebar) which shows query volume, denied access logs, and active users by role.
 
